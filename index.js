@@ -48,12 +48,28 @@ app.post('/json', async (req, res) => {
     await newData.save();
 
     // Responder con éxito
+    console.log('Guardado ok');
+    console.log(JSON.stringify(req.body, null, 2));
     res.status(201).json({ message: 'Datos guardados exitosamente en MongoDB', data: req.body });
   } catch (error) {
+    console.log('Error con los datos');
+    console.log(JSON.stringify(req.body, null, 2));
     console.error('Error al guardar datos:', error);
     res.status(500).json({ message: 'Error al procesar la solicitud', error });
   }
 });
+
+// Nueva ruta para obtener los datos almacenados
+app.get('/data', async (req, res) => {
+  try {
+    const data = await InputData.find();
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Error al obtener los datos:', error);
+    res.status(500).json({ message: 'Error al obtener los datos' });
+  }
+});
+
 
 // Iniciar el servidor
 app.listen(port, () => {
