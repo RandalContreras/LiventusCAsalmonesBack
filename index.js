@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 
 // Configurar la aplicación y el puerto
 const app = express();
-const port = 3000;
+const port = 7000;
 
 // Middleware para parsear JSON
 app.use(express.json());
@@ -39,7 +39,7 @@ const inputSchema = new mongoose.Schema({
 const InputData = mongoose.model('InputData', inputSchema);
 
 // Ruta para recibir el JSON y almacenarlo en MongoDB
-app.post('/json', async (req, res) => {
+app.post('/', async (req, res) => {
   try {
     // Crear una nueva instancia del modelo con el JSON recibido
     const newData = new InputData(req.body);
