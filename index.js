@@ -1,6 +1,8 @@
 // Importar dependencias
 const express = require('express');
 const mongoose = require('mongoose');
+const cors = require('cors'); // Importa la librería cors
+const fs = require('fs'); // Importa el módulo File System para escribir archivos
 
 // Configurar la aplicación y el puerto
 const app = express();
@@ -8,6 +10,7 @@ const port = 7000;
 
 // Middleware para parsear JSON
 app.use(express.json());
+app.use(cors());
 
 // Conexión a la base de datos MongoDB
 const mongoURI = 'mongodb+srv://liventusUser:L1v3ntus_2024@liventuscluster0.2l1ih.mongodb.net/sensores_db?retryWrites=true&w=majority';
@@ -47,12 +50,22 @@ app.post('/', async (req, res) => {
     // Guardar el documento en la base de datos
     await newData.save();
 
+    // Guardar el JSON recibido en un archivo de log con la fecha actual
+    const logData = `Fecha: ${new Date().toISOString()}\n${JSON.stringify(req.body, null, 2)}\n\n`;
+    fs.appendFileSync('./log.txt', logData); // Guardar en un archivo llamado "log.txt" en la ruta del proyecto
+
     // Responder con éxito
     console.log('Guardado ok');
     console.log(JSON.stringify(req.body, null, 2));
     res.status(201).json({ message: 'Datos guardados exitosamente en MongoDB', data: req.body });
   } catch (error) {
     console.log('Error con los datos');
+
+    // Registrar el error en el archivo de log
+    const errorLog = `Fecha: ${new Date().toISOString()}\nError al guardar datos: ${error.message}\nDatos: ${JSON.stringify(req.body, null, 2)}\n\n`;
+    fs.appendFileSync('./log.txt', errorLog); // Guardar en un archivo llamado "log.txt" en la ruta del proyecto
+  
+
     console.log(JSON.stringify(req.body, null, 2));
     console.error('Error al guardar datos:', error);
     res.status(500).json({ message: 'Error al procesar la solicitud', error });
