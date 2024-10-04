@@ -60,7 +60,7 @@ app.post('/', async (req, res) => {
     // Responder con éxito
     console.log('Guardado ok');
     console.log(JSON.stringify(req.body, null, 2));
-    res.status(201).json({ message: 'Datos guardados exitosamente en MongoDB', data: req.body });
+    res.status(200).json({ message: 'Datos guardados exitosamente en MongoDB', data: req.body });
   } catch (error) {
     console.log('Error con los datos');
     fs.appendFileSync('./log.txt', 'Error con los datos');
