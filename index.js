@@ -45,6 +45,7 @@ const InputData = mongoose.model('InputData', inputSchema);
 app.post('/', async (req, res) => {
   try {
 
+    console.log(req);
      // Guardar el JSON recibido en un archivo de log con la fecha actual
      const logData = `Fecha: ${new Date().toISOString()}\n${JSON.stringify(req.body, null, 2)}\n\n`;
      fs.appendFileSync('./log.txt', logData); // Guardar en un archivo llamado "log.txt" en la ruta del proyecto
