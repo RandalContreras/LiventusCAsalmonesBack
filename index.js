@@ -44,15 +44,18 @@ const InputData = mongoose.model('InputData', inputSchema);
 // Ruta para recibir el JSON y almacenarlo en MongoDB
 app.post('/', async (req, res) => {
   try {
+
+     // Guardar el JSON recibido en un archivo de log con la fecha actual
+     const logData = `Fecha: ${new Date().toISOString()}\n${JSON.stringify(req.body, null, 2)}\n\n`;
+     fs.appendFileSync('./log.txt', logData); // Guardar en un archivo llamado "log.txt" en la ruta del proyecto
+
     // Crear una nueva instancia del modelo con el JSON recibido
     const newData = new InputData(req.body);
     
     // Guardar el documento en la base de datos
     await newData.save();
 
-    // Guardar el JSON recibido en un archivo de log con la fecha actual
-    const logData = `Fecha: ${new Date().toISOString()}\n${JSON.stringify(req.body, null, 2)}\n\n`;
-    fs.appendFileSync('./log.txt', logData); // Guardar en un archivo llamado "log.txt" en la ruta del proyecto
+   
 
     // Responder con éxito
     console.log('Guardado ok');
@@ -60,6 +63,7 @@ app.post('/', async (req, res) => {
     res.status(201).json({ message: 'Datos guardados exitosamente en MongoDB', data: req.body });
   } catch (error) {
     console.log('Error con los datos');
+    fs.appendFileSync('./log.txt', 'Error con los datos');
 
     // Registrar el error en el archivo de log
     const errorLog = `Fecha: ${new Date().toISOString()}\nError al guardar datos: ${error.message}\nDatos: ${JSON.stringify(req.body, null, 2)}\n\n`;
