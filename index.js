@@ -41,7 +41,30 @@ const inputSchema = new mongoose.Schema({
 // Crear un modelo basado en el esquema
 const InputData = mongoose.model('InputData', inputSchema);
 
-// Ruta para recibir el JSON y almacenarlo en MongoDB
+// Ruta para manejar la solicitud POST en la raíz ('/')
+app.post('/', (req, res) => {
+  const body = req.body;
+
+  // Validar si el body contiene los datos esperados
+  if (!body || !body.input1) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Invalid request body. Expected "input1" field in the JSON.'
+    });
+  }
+
+  // Procesar el JSON recibido (aquí se imprime en consola como ejemplo)
+  console.log('Solicitud recibida con el siguiente cuerpo:', body);
+
+  // Enviar una respuesta de éxito con el cuerpo recibido
+  res.status(200).json({
+    status: 'success',
+    receivedData: body
+  });
+});
+
+
+/* // Ruta para recibir el JSON y almacenarlo en MongoDB
 app.post('/', async (req, res) => {
   try {
 
@@ -75,7 +98,7 @@ app.post('/', async (req, res) => {
     console.error('Error al guardar datos:', error);
     res.status(500).json({ message: 'Error al procesar la solicitud', error });
   }
-});
+}); */
 
 // Nueva ruta para obtener los datos almacenados
 app.get('/data', async (req, res) => {
