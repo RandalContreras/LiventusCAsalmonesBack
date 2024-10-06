@@ -1,6 +1,5 @@
 // Importar dependencias
 const mongoose = require('mongoose');
-const cors = require('cors'); // Importa la librería cors
 const fs = require('fs'); // Importa el módulo File System para escribir archivos
 const http = require('http'); // Importar el módulo http nativo de Node.js
 
@@ -38,6 +37,19 @@ const InputData = mongoose.model('InputData', inputSchema);
 
 // Crear el servidor HTTP
 const server = http.createServer((req, res) => {
+
+  // Agregar cabeceras de CORS a todas las solicitudes
+  res.setHeader('Access-Control-Allow-Origin', '*'); // Permitir cualquier origen
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); // Métodos permitidos
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type'); // Cabeceras permitidas
+
+  // Manejar solicitudes OPTIONS (preflight) para CORS
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204); // Sin contenido para OPTIONS
+    res.end();
+    return;
+  }
+
   // Solo aceptar solicitudes POST y GET en la ruta raíz
   if (req.method === 'POST' && req.url === '/') {
     let body = '';
