@@ -4,13 +4,8 @@ const cors = require('cors'); // Importa la librería cors
 const fs = require('fs'); // Importa el módulo File System para escribir archivos
 const http = require('http'); // Importar el módulo http nativo de Node.js
 
-
 // Configurar la aplicación y el puerto
 const port = 7000;
-
-// Middleware para parsear JSON
-//app.use(express.json());
-
 
 // Conexión a la base de datos MongoDB
 const mongoURI = 'mongodb+srv://liventusUser:L1v3ntus_2024@liventuscluster0.2l1ih.mongodb.net/sensores_db?retryWrites=true&w=majority';
@@ -43,46 +38,57 @@ const InputData = mongoose.model('InputData', inputSchema);
 
 // Crear el servidor HTTP
 const server = http.createServer((req, res) => {
-  // Solo aceptar solicitudes POST en la ruta raíz
+  // Solo aceptar solicitudes POST y GET en la ruta raíz
   if (req.method === 'POST' && req.url === '/') {
-      let body = '';
+    let body = '';
 
-      // Escuchar el evento 'data' para recibir los datos del cuerpo de la solicitud
-      req.on('data', chunk => {
-          body += chunk.toString(); // Convertir los datos binarios a string y agregarlos al cuerpo
-      });
+    // Escuchar el evento 'data' para recibir los datos del cuerpo de la solicitud
+    req.on('data', chunk => {
+      body += chunk.toString(); // Convertir los datos binarios a string y agregarlos al cuerpo
+    });
 
-      // Una vez que se recibe todo el cuerpo de la solicitudc
-      req.on('end', () => {
-          try {
-              console.log(body);
+    // Una vez que se recibe todo el cuerpo de la solicitud
+    req.on('end', () => {
+      try {
+        console.log(body);
 
-              // Intentar analizar el cuerpo como JSON
-              const jsonData = JSON.parse(body);
+        // Intentar analizar el cuerpo como JSON
+        const jsonData = JSON.parse(body);
 
-              // Crear una nueva instancia del modelo con el JSON recibido
-              const newData = new InputData(jsonData);
-              
-              saveMongo(newData);
-              
+        // Crear una nueva instancia del modelo con el JSON recibido
+        const newData = new InputData(jsonData);
 
-              // Procesar el JSON recibido según sea necesario (aquí se imprime en consola)
-              console.log('Solicitud recibida con el siguiente cuerpo:', jsonData);
+        saveMongo(newData);
 
-              // Enviar una respuesta de éxito
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ status: 'success', receivedData: jsonData }));
-          } catch (error) {
-              // Manejar errores en caso de que el cuerpo no sea JSON válido
-              console.error('Error al procesar la solicitud:', error.message);
-              res.writeHead(400, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ status: 'error', message: 'Invalid JSON' }));
-          }
+        // Procesar el JSON recibido según sea necesario (aquí se imprime en consola)
+        console.log('Solicitud recibida con el siguiente cuerpo:', jsonData);
+
+        // Enviar una respuesta de éxito
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'success', receivedData: jsonData }));
+      } catch (error) {
+        // Manejar errores en caso de que el cuerpo no sea JSON válido
+        console.error('Error al procesar la solicitud:', error.message);
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'error', message: 'Invalid JSON' }));
+      }
+    });
+  } else if (req.method === 'GET' && req.url === '/') {
+    // Manejar las solicitudes GET a la raíz para devolver todos los documentos
+    InputData.find({})
+      .then(data => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'success', data }));
+      })
+      .catch(error => {
+        console.error('Error al obtener los datos de la base de datos:', error);
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'error', message: 'Error al obtener los datos' }));
       });
   } else {
-      // Manejar cualquier solicitud que no sea POST a la raíz
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'error', message: 'Not Found' }));
+    // Manejar cualquier solicitud que no sea POST o GET a la raíz
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'error', message: 'Not Found' }));
   }
 });
 
@@ -99,7 +105,6 @@ const saveMongo = async (newData) => {
     return false;
   }
 };
-
 
 // Iniciar el servidor
 server.listen(port, () => {
