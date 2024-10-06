@@ -1,16 +1,16 @@
 // Importar dependencias
-const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors'); // Importa la librería cors
 const fs = require('fs'); // Importa el módulo File System para escribir archivos
+const http = require('http'); // Importar el módulo http nativo de Node.js
+
 
 // Configurar la aplicación y el puerto
-const app = express();
 const port = 7000;
 
 // Middleware para parsear JSON
-app.use(express.json());
-app.use(cors());
+//app.use(express.json());
+
 
 // Conexión a la base de datos MongoDB
 const mongoURI = 'mongodb+srv://liventusUser:L1v3ntus_2024@liventuscluster0.2l1ih.mongodb.net/sensores_db?retryWrites=true&w=majority';
@@ -41,78 +41,67 @@ const inputSchema = new mongoose.Schema({
 // Crear un modelo basado en el esquema
 const InputData = mongoose.model('InputData', inputSchema);
 
-// Ruta para manejar la solicitud POST en la raíz ('/')
-app.post('/', (req, res) => {
-  const body = req.body;
+// Crear el servidor HTTP
+const server = http.createServer((req, res) => {
+  // Solo aceptar solicitudes POST en la ruta raíz
+  if (req.method === 'POST' && req.url === '/') {
+      let body = '';
 
-  // Validar si el body contiene los datos esperados
-  if (!body || !body.input1) {
-    return res.status(400).json({
-      status: 'error',
-      message: 'Invalid request body. Expected "input1" field in the JSON.'
-    });
+      // Escuchar el evento 'data' para recibir los datos del cuerpo de la solicitud
+      req.on('data', chunk => {
+          body += chunk.toString(); // Convertir los datos binarios a string y agregarlos al cuerpo
+      });
+
+      // Una vez que se recibe todo el cuerpo de la solicitudc
+      req.on('end', () => {
+          try {
+              console.log(body);
+
+              // Intentar analizar el cuerpo como JSON
+              const jsonData = JSON.parse(body);
+
+              // Crear una nueva instancia del modelo con el JSON recibido
+              const newData = new InputData(req.body);
+              
+              saveMongo(newData);
+              
+
+              // Procesar el JSON recibido según sea necesario (aquí se imprime en consola)
+              console.log('Solicitud recibida con el siguiente cuerpo:', jsonData);
+
+              // Enviar una respuesta de éxito
+              res.writeHead(200, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ status: 'success', receivedData: jsonData }));
+          } catch (error) {
+              // Manejar errores en caso de que el cuerpo no sea JSON válido
+              console.error('Error al procesar la solicitud:', error.message);
+              res.writeHead(400, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ status: 'error', message: 'Invalid JSON' }));
+          }
+      });
+  } else {
+      // Manejar cualquier solicitud que no sea POST a la raíz
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'error', message: 'Not Found' }));
   }
-
-  // Procesar el JSON recibido (aquí se imprime en consola como ejemplo)
-  console.log('Solicitud recibida con el siguiente cuerpo:', body);
-
-  // Enviar una respuesta de éxito con el cuerpo recibido
-  res.status(200).json({
-    status: 'success',
-    receivedData: body
-  });
 });
 
-
-/* // Ruta para recibir el JSON y almacenarlo en MongoDB
-app.post('/', async (req, res) => {
+const saveMongo = async (newData) => {
   try {
-
-    console.log(req);
-     // Guardar el JSON recibido en un archivo de log con la fecha actual
-     const logData = `Fecha: ${new Date().toISOString()}\n${JSON.stringify(req.body, null, 2)}\n\n`;
-     fs.appendFileSync('./log.txt', logData); // Guardar en un archivo llamado "log.txt" en la ruta del proyecto
-
-    // Crear una nueva instancia del modelo con el JSON recibido
-    const newData = new InputData(req.body);
-    
     // Guardar el documento en la base de datos
     await newData.save();
 
-   
-
-    // Responder con éxito
-    console.log('Guardado ok');
-    console.log(JSON.stringify(req.body, null, 2));
-    res.status(200).json({ message: 'Datos guardados exitosamente en MongoDB', data: req.body });
+    // Devuelve `true` si el valor es mayor a 10, en caso contrario devuelve `false`
+    return true;
   } catch (error) {
-    console.log('Error con los datos');
-    fs.appendFileSync('./log.txt', 'Error con los datos');
-
-    // Registrar el error en el archivo de log
-    const errorLog = `Fecha: ${new Date().toISOString()}\nError al guardar datos: ${error.message}\nDatos: ${JSON.stringify(req.body, null, 2)}\n\n`;
-    fs.appendFileSync('./log.txt', errorLog); // Guardar en un archivo llamado "log.txt" en la ruta del proyecto
-  
-
-    console.log(JSON.stringify(req.body, null, 2));
-    console.error('Error al guardar datos:', error);
-    res.status(500).json({ message: 'Error al procesar la solicitud', error });
+    console.error('Error processing value:', error);
+    // En caso de error, se podría manejar de alguna manera o devolver `false`
+    return false;
   }
-}); */
-
-// Nueva ruta para obtener los datos almacenados
-app.get('/data', async (req, res) => {
-  try {
-    const data = await InputData.find();
-    res.status(200).json(data);
-  } catch (error) {
-    console.error('Error al obtener los datos:', error);
-    res.status(500).json({ message: 'Error al obtener los datos' });
-  }
-});
+};
 
 
 // Iniciar el servidor
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`API Rest escuchando en http://localhost:${port}`);
 });
