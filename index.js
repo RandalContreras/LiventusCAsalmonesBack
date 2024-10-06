@@ -61,7 +61,7 @@ const server = http.createServer((req, res) => {
               const jsonData = JSON.parse(body);
 
               // Crear una nueva instancia del modelo con el JSON recibido
-              const newData = new InputData(req.body);
+              const newData = new InputData(jsonData);
               
               saveMongo(newData);
               
