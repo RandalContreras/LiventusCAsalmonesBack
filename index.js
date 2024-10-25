@@ -1,6 +1,5 @@
 // Importar dependencias
 const mongoose = require('mongoose');
-const fs = require('fs'); // Importa el módulo File System para escribir archivos
 const http = require('http'); // Importar el módulo http nativo de Node.js
 
 // Configurar la aplicación y el puerto
@@ -36,7 +35,7 @@ const inputSchema = new mongoose.Schema({
 const InputData = mongoose.model('InputData', inputSchema);
 
 // Crear el servidor HTTP
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
 
   // Agregar cabeceras de CORS a todas las solicitudes
   res.setHeader('Access-Control-Allow-Origin', '*'); // Permitir cualquier origen
@@ -60,43 +59,42 @@ const server = http.createServer((req, res) => {
     });
 
     // Una vez que se recibe todo el cuerpo de la solicitud
-    req.on('end', () => {
+    req.on('end', async () => {
       try {
-        console.log(body);
-
-        // Intentar analizar el cuerpo como JSON
         const jsonData = JSON.parse(body);
-
-        // Crear una nueva instancia del modelo con el JSON recibido
         const newData = new InputData(jsonData);
-
-        saveMongo(newData);
-
-        // Procesar el JSON recibido según sea necesario (aquí se imprime en consola)
-        console.log('Solicitud recibida con el siguiente cuerpo:', jsonData);
+        await saveMongo(newData);
 
         // Enviar una respuesta de éxito
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'success', receivedData: jsonData }));
       } catch (error) {
-        // Manejar errores en caso de que el cuerpo no sea JSON válido
         console.error('Error al procesar la solicitud:', error.message);
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'error', message: 'Invalid JSON' }));
       }
     });
   } else if (req.method === 'GET' && req.url === '/') {
-    // Manejar las solicitudes GET a la raíz para devolver todos los documentos
-    InputData.find({})
-      .then(data => {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'success', data }));
-      })
-      .catch(error => {
-        console.error('Error al obtener los datos de la base de datos:', error);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'error', message: 'Error al obtener los datos' }));
-      });
+    // Manejar las solicitudes GET a la raíz para devolver documentos paginados
+    const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
+    const page = parseInt(urlParams.get('page')) || 0;
+    const limit = parseInt(urlParams.get('limit')) || 5;
+    
+    try {
+      const data = await InputData.find({})
+        .sort({ 'input1.date': -1 })
+        .skip(page * limit)
+        .limit(limit);
+
+      const totalCount = await InputData.countDocuments();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'success', data, totalCount }));
+    } catch (error) {
+      console.error('Error al obtener los datos de la base de datos:', error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'error', message: 'Error al obtener los datos' }));
+    }
   } else {
     // Manejar cualquier solicitud que no sea POST o GET a la raíz
     res.writeHead(404, { 'Content-Type': 'application/json' });
@@ -104,16 +102,13 @@ const server = http.createServer((req, res) => {
   }
 });
 
+// Función para guardar en MongoDB
 const saveMongo = async (newData) => {
   try {
-    // Guardar el documento en la base de datos
     await newData.save();
-
-    // Devuelve `true` si el valor es mayor a 10, en caso contrario devuelve `false`
     return true;
   } catch (error) {
-    console.error('Error processing value:', error);
-    // En caso de error, se podría manejar de alguna manera o devolver `false`
+    console.error('Error saving data:', error);
     return false;
   }
 };
