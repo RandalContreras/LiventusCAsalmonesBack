@@ -1,6 +1,6 @@
 // Importar dependencias
 const mongoose = require('mongoose');
-const http = require('http'); // Importar el módulo http nativo de Node.js
+const http = require('http');
 
 // Configurar la aplicación y el puerto
 const port = 7000;
@@ -38,34 +38,31 @@ const InputData = mongoose.model('InputData', inputSchema);
 const server = http.createServer(async (req, res) => {
 
   // Agregar cabeceras de CORS a todas las solicitudes
-  res.setHeader('Access-Control-Allow-Origin', '*'); // Permitir cualquier origen
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS'); // Métodos permitidos
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type'); // Cabeceras permitidas
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Manejar solicitudes OPTIONS (preflight) para CORS
+  // Manejar solicitudes OPTIONS
   if (req.method === 'OPTIONS') {
-    res.writeHead(204); // Sin contenido para OPTIONS
+    res.writeHead(204);
     res.end();
     return;
   }
 
-  // Solo aceptar solicitudes POST y GET en la ruta raíz
+  // Manejar solicitudes POST
   if (req.method === 'POST' && req.url === '/') {
     let body = '';
 
-    // Escuchar el evento 'data' para recibir los datos del cuerpo de la solicitud
     req.on('data', chunk => {
-      body += chunk.toString(); // Convertir los datos binarios a string y agregarlos al cuerpo
+      body += chunk.toString();
     });
 
-    // Una vez que se recibe todo el cuerpo de la solicitud
     req.on('end', async () => {
       try {
         const jsonData = JSON.parse(body);
         const newData = new InputData(jsonData);
         await saveMongo(newData);
 
-        // Enviar una respuesta de éxito
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'success', receivedData: jsonData }));
       } catch (error) {
@@ -74,12 +71,24 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ status: 'error', message: 'Invalid JSON' }));
       }
     });
-  } else if (req.method === 'GET' && req.url === '/') {
+  } else if (req.method === 'GET' && req.url === '/grafico') {
+    // Manejar las solicitudes GET a "/grafico" para devolver todos los documentos
+    try {
+      const data = await InputData.find({}); // Obtener todos los documentos
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'success', data }));
+    } catch (error) {
+      console.error('Error al obtener los datos de la base de datos:', error);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'error', message: 'Error al obtener los datos' }));
+    }
+  } else if (req.method === 'GET' && req.url.startsWith('/?')) {
     // Manejar las solicitudes GET a la raíz para devolver documentos paginados
     const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
     const page = parseInt(urlParams.get('page')) || 0;
     const limit = parseInt(urlParams.get('limit')) || 5;
-    
+
     try {
       const data = await InputData.find({})
         .sort({ 'input1.date': -1 })
@@ -96,7 +105,6 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ status: 'error', message: 'Error al obtener los datos' }));
     }
   } else {
-    // Manejar cualquier solicitud que no sea POST o GET a la raíz
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'error', message: 'Not Found' }));
   }
