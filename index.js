@@ -91,7 +91,7 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const data = await InputData.find({})
-        .sort({ 'input1.date': -1 })
+        .sort({ '_id': -1 })
         .skip(page * limit)
         .limit(limit);
 
