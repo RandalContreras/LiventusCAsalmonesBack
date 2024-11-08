@@ -34,6 +34,25 @@ const inputSchema = new mongoose.Schema({
 // Crear un modelo basado en el esquema
 const InputData = mongoose.model('InputData', inputSchema);
 
+// Función para convertir fecha UTC a UTC-3 en el formato "DD/MM/YYYY HH:mm:ss"
+const convertToUtcMinus3 = (utcDateStr) => {
+  // Parsear la fecha en formato "DD/MM/YYYY HH:mm:ss"
+  const [datePart, timePart] = utcDateStr.split(" "); // Separar la fecha y hora
+  const [day, month, year] = datePart.split("/"); // Separar día, mes y año
+  const [hours, minutes, seconds] = timePart.split(":"); // Separar horas, minutos y segundos
+
+  // Crear un objeto Date a partir de los valores
+  const date = new Date(year, month - 1, day, hours, minutes, seconds);
+
+  // Restar 3 horas para ajustar a UTC-3
+  date.setHours(date.getHours() - 3);
+
+  // Formatear nuevamente en el mismo formato "DD/MM/YYYY HH:mm:ss"
+  const formattedDate = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
+
+  return formattedDate;
+};
+
 // Crear el servidor HTTP
 const server = http.createServer(async (req, res) => {
 
@@ -72,12 +91,20 @@ const server = http.createServer(async (req, res) => {
       }
     });
   } else if (req.method === 'GET' && req.url === '/grafico') {
-    // Manejar las solicitudes GET a "/grafico" para devolver todos los documentos
+    // Manejar las solicitudes GET a "/grafico" para devolver todos los documentos, excluyendo "Presion_Atmosferica" y "Sensor_Virtual"
     try {
-      const data = await InputData.find({}); // Obtener todos los documentos
+      const data = await InputData.find({
+        'input1.name': { $nin: ['Presion_Atmosferica', 'Sensor_Virtual'] }
+      }); // Filtrar por nombre
+
+      // Convertir las fechas a UTC-3
+      const result = data.map(item => {
+        item.input1.date = convertToUtcMinus3(item.input1.date);
+        return item;
+      });
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'success', data }));
+      res.end(JSON.stringify({ status: 'success', data: result }));
     } catch (error) {
       console.error('Error al obtener los datos de la base de datos:', error);
       res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -90,15 +117,23 @@ const server = http.createServer(async (req, res) => {
     const limit = parseInt(urlParams.get('limit')) || 5;
 
     try {
-      const data = await InputData.find({})
+      const data = await InputData.find({
+        'input1.name': { $nin: ['Presion_Atmosferica', 'Sensor_Virtual'] }
+      })
         .sort({ '_id': -1 })
         .skip(page * limit)
         .limit(limit);
 
+      // Convertir las fechas a UTC-3
+      const result = data.map(item => {
+        item.input1.date = convertToUtcMinus3(item.input1.date);
+        return item;
+      });
+
       const totalCount = await InputData.countDocuments();
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'success', data, totalCount }));
+      res.end(JSON.stringify({ status: 'success', data: result, totalCount }));
     } catch (error) {
       console.error('Error al obtener los datos de la base de datos:', error);
       res.writeHead(500, { 'Content-Type': 'application/json' });
