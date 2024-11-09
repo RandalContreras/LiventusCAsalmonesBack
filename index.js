@@ -1,4 +1,4 @@
-// Importar dependencias
+// Importar dependencias 
 const mongoose = require('mongoose');
 const http = require('http');
 
@@ -36,21 +36,14 @@ const InputData = mongoose.model('InputData', inputSchema);
 
 // Función para convertir fecha UTC a UTC-3 en el formato "DD/MM/YYYY HH:mm:ss"
 const convertToUtcMinus3 = (utcDateStr) => {
-  // Parsear la fecha en formato "DD/MM/YYYY HH:mm:ss"
   const [datePart, timePart] = utcDateStr.split(" "); // Separar la fecha y hora
   const [day, month, year] = datePart.split("/"); // Separar día, mes y año
   const [hours, minutes, seconds] = timePart.split(":"); // Separar horas, minutos y segundos
 
-  // Crear un objeto Date a partir de los valores
   const date = new Date(year, month - 1, day, hours, minutes, seconds);
+  date.setHours(date.getHours() - 3); // Restar 3 horas para ajustar a UTC-3
 
-  // Restar 3 horas para ajustar a UTC-3
-  date.setHours(date.getHours() - 3);
-
-  // Formatear nuevamente en el mismo formato "DD/MM/YYYY HH:mm:ss"
-  const formattedDate = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
-
-  return formattedDate;
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
 };
 
 // Crear el servidor HTTP
@@ -90,12 +83,56 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ status: 'error', message: 'Invalid JSON' }));
       }
     });
-  } else if (req.method === 'GET' && req.url === '/grafico') {
-    // Manejar las solicitudes GET a "/grafico" para devolver todos los documentos, excluyendo "Presion_Atmosferica" y "Sensor_Virtual"
+    return; // Añadir return aquí para evitar ejecución posterior de otros bloques
+  }
+
+  // Manejar solicitudes GET a "/grafico"
+  if (req.method === 'GET' && req.url === '/grafico') {
+    try {
+      const data = await InputData.find();
+
+      // Convertir las fechas a UTC-3
+      const result = data.map(item => {
+        item.input1.date = convertToUtcMinus3(item.input1.date);
+        return item;
+      });
+
+      const totalCount = await InputData.countDocuments();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'success', data: result, totalCount }));
+    } catch (error) {
+      console.error('Error al obtener los datos de la base de datos:', error);
+      if (!res.headersSent) { // Verifica si ya se han enviado los encabezados
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'error', message: 'Error al obtener los datos' }));
+      }
+    }
+    return; // Añadir return aquí para evitar ejecución posterior de otros bloques
+  }
+
+  // Manejar solicitudes GET a "/graficoConFecha"
+  if (req.method === 'GET' && req.url.startsWith('/graficoConFecha')) {
+    const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
+    const page = parseInt(urlParams.get('page')) || 0;
+    const limit = parseInt(urlParams.get('limit')) || 5;
+    const fechaInicio = urlParams.get('fecha_inicio');
+    const fechaTermino = urlParams.get('fecha_termino');
+
+    if (!fechaInicio || !fechaTermino) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'error', message: 'Faltan parámetros de fecha' }));
+      return;
+    }
+
     try {
       const data = await InputData.find({
-        'input1.name': { $nin: ['Presion_Atmosferica', 'Sensor_Virtual'] }
-      }); // Filtrar por nombre
+        'input1.name': { $nin: ['Presion_Atmosferica', 'Sensor_Virtual'] },
+        'input1.date': { $gte: fechaInicio, $lte: fechaTermino }
+      })
+        .sort({ '_id': -1 })
+        .skip(page * limit)
+        .limit(limit);
 
       // Convertir las fechas a UTC-3
       const result = data.map(item => {
@@ -105,13 +142,19 @@ const server = http.createServer(async (req, res) => {
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 'success', data: result }));
+
     } catch (error) {
       console.error('Error al obtener los datos de la base de datos:', error);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'error', message: 'Error al obtener los datos' }));
+      if (!res.headersSent) { // Verifica si ya se han enviado los encabezados
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'error', message: 'Error al obtener los datos' }));
+      }
     }
-  } else if (req.method === 'GET' && req.url.startsWith('/?')) {
-    // Manejar las solicitudes GET a la raíz para devolver documentos paginados
+    return; // Añadir return aquí para evitar ejecución posterior de otros bloques
+  }
+
+  // Manejar solicitudes GET a la raíz para devolver documentos paginados
+  if (req.method === 'GET' && req.url.startsWith('/?')) {
     const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
     const page = parseInt(urlParams.get('page')) || 0;
     const limit = parseInt(urlParams.get('limit')) || 5;
@@ -134,15 +177,20 @@ const server = http.createServer(async (req, res) => {
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 'success', data: result, totalCount }));
+
     } catch (error) {
       console.error('Error al obtener los datos de la base de datos:', error);
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'error', message: 'Error al obtener los datos' }));
+      if (!res.headersSent) { // Verifica si ya se han enviado los encabezados
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'error', message: 'Error al obtener los datos' }));
+      }
     }
-  } else {
-    res.writeHead(404, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'error', message: 'Not Found' }));
+    return; // Añadir return aquí para evitar ejecución posterior de otros bloques
   }
+
+  // Manejo de rutas no encontradas
+  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ status: 'error', message: 'Not Found' }));
 });
 
 // Función para guardar en MongoDB
