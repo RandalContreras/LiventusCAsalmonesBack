@@ -89,7 +89,9 @@ const server = http.createServer(async (req, res) => {
   // Manejar solicitudes GET a "/grafico"
   if (req.method === 'GET' && req.url === '/grafico') {
     try {
-      const data = await InputData.find();
+      const data = await InputData.find({
+        'input1.name': { $nin: ['Presion_Atmosferica', 'Sensor_Virtual'] }
+      });
 
       // Convertir las fechas a UTC-3
       const result = data.map(item => {
